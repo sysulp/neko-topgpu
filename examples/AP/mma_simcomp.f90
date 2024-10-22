@@ -199,7 +199,8 @@ contains
     type(vector_t) :: Vdf0dx
     type(vector_t) :: Vfval
     type(matrix_t) :: Vdfdx
-    
+    type(vector_t) :: Vdesignx
+
 
     character(len=80) :: iFileName ! Filename to save the VTK data
 
@@ -214,16 +215,19 @@ contains
     call Vdf0dx%init(this%mma%get_n())
     call Vfval%init(this%mma%get_m())
     call Vdfdx%init(this%mma%get_m(),this%mma%get_n())
-    
+    call Vdesignx%init(this%mma%get_n())
+
+
     call device_memcpy_r1(x, Vx%x_d,this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
     call device_memcpy_r1(df0dx, Vdf0dx%x_d,this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
     call device_memcpy_r1(fval, Vfval%x_d,this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
     call device_memcpy_r2(dfdx, Vdfdx%x_d,this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
-    
+    call device_memcpy_r1(x, Vdesignx%x_d,this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
+
     
     iter =0
     call this%mma%mma_gensub_gpu(iter, Vx, Vdf0dx, Vfval, Vdfdx)
-    
+    call this%mma%mma_subsolve_dpip_gpu(Vdesignx)
 
   end subroutine simcomp_test_compute
 
