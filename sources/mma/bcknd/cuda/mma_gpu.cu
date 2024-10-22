@@ -2,10 +2,13 @@
 #include "mma_gpu_kernel.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+
+extern "C" {
 #include "../../../../external/neko/src/math/bcknd/device/device_mpi_reduce.h"
 #include "../../../../external/neko/src/math/bcknd/device/device_mpi_op.h"
 #include "../../../../external/neko/src/device/device_config.h"
-void mma_gensub4_gpu(void* x, void* low, void* upp, void* pij, void* qij, int* n, int* m, void* bi) {
+void mma_gensub4_cuda(void* x, void* low, void* upp, void* pij, void* qij, int* n, int* m, void* bi) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     real* temp;
@@ -25,38 +28,38 @@ void mma_gensub4_gpu(void* x, void* low, void* upp, void* pij, void* qij, int* n
     cudaFree(temp);
     cudaFree(temp_sum);
 
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
 
-void mma_gensub3_gpu(void* x, void* df0dx, void* dfdx, void* low, void* upp, void* xmin, void* xmax, void* alpha, void* beta,
+void mma_gensub3_cuda(void* x, void* df0dx, void* dfdx, void* low, void* upp, void* xmin, void* xmax, void* alpha, void* beta,
     void* p0j, void* q0j, void* pij, void* qij, int* n, int* m) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     mma_sub3_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)x, (real*)df0dx, (real*)dfdx, (real*)low,
         (real*)upp, (real*)xmin, (real*)xmax, (real*)alpha, (real*)beta, (real*)p0j, (real*)q0j, (real*)pij, (real*)qij, *n, *m);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
 
-void mma_gensub2_gpu(void* low, void* upp, void* x, void* xold1, void* xold2, void* xmin, void* xmax,
+void mma_gensub2_cuda(void* low, void* upp, void* x, void* xold1, void* xold2, void* xmin, void* xmax,
     real* asydecr, real* asyincr, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     mma_sub2_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)low, (real*)upp, (real*)x, (real*)xold1,
         (real*)xold2, (real*)xmin, (real*)xmax, *asydecr, *asyincr, *n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
-void mma_gensub1_gpu(void* low, void* upp, void* x, void* xmin, void* xmax, real* asyinit, int* n) {
+void mma_gensub1_cuda(void* low, void* upp, void* x, void* xmin, void* xmax, real* asyinit, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     mma_sub1_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)low, (real*)upp, 
         (real*)x, (real*)xmin, (real*)xmax, *asyinit, *n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 void cuda_mma_max(void* xsi, void* x, void* alpha, int *n) {
@@ -65,7 +68,7 @@ void cuda_mma_max(void* xsi, void* x, void* alpha, int *n) {
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
 
     mma_max2_kernel<real><<<nblcks, nthrds, 0,(cudaStream_t) glb_cmd_queue>>>((real *) xsi, (real *) x, (real *) alpha, *n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 void cuda_relambda(void* relambda,  void* x,  void* xupp,  void* xlow,
@@ -90,7 +93,7 @@ void cuda_relambda(void* relambda,  void* x,  void* xupp,  void* xlow,
     }
     cudaFree(temp);
     cudaFree(temp_sum);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
     
 }
 
@@ -100,7 +103,7 @@ void cuda_sub2cons2(void* a, void* b, void* c, void* d, real* e, int* n) {
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
     sub2cons2_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)a, (real*)b, (real*)c, (real*)d, *e, *n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -112,7 +115,7 @@ real cuda_maxval(void* a, int* n) {
     int nb = ((*n) + 2048 - 1) / 2048;
     maxval_kernel <real> << <nb, 1024 >> > ((real*)a, temp, (*n));
     max_reduce_kernel<real> << <1, 1024, 0 >> > (temp, nb);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
     cudaMemcpy(temp_cpu, temp, sizeof(real), cudaMemcpyDeviceToHost);
     cudaFree(temp);
     return temp_cpu[0];
@@ -127,7 +130,7 @@ void cuda_delx(void* delx, void* x, void* xlow, void* xupp, void* pij, void* qij
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     delx_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)delx, (real*)x, (real*)xlow, (real*)xupp,
         (real*)pij, (real*)qij, (real*)p0j, (real*)q0j,(real*)alpha, (real*)beta, (real*) lambda, *epsi, * n,*m);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -142,7 +145,7 @@ void cuda_dellambda(void* dellambda, void*x,  void*xlow,void*  xupp,
         (real*)pij, (real*) qij, *n);
     mmareduce_kernel<real> << <1, 1024, 0 >> > (temp, nb);
     cudaFree(temp);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
     cudaMemcpy(dellambda_d, temp, sizeof(real), cudaMemcpyDeviceToDevice);
 }
 
@@ -153,7 +156,7 @@ void cuda_GG(void* GG, void* x, void* xlow, void* xupp,
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     GG_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> >((real*)GG, (real*)x,  (real*)xlow,(real*) xupp,
         (real*)pij, (real*) qij, *n,*m);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 void cuda_diagx(void* diagx, void* x, void* xsi,void* xlow, void* xupp,
@@ -163,7 +166,7 @@ void cuda_diagx(void* diagx, void* x, void* xsi,void* xlow, void* xupp,
  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
  diagx_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> >((real*)diagx, (real*)x,  (real*)xsi,(real*)xlow,
     (real*) xupp,(real*)p0j, (real*) q0j, (real*)pij, (real*) qij, (real*)alpha, (real*) beta, (real*)eta, (real*) lambda, *n,*m);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -201,7 +204,7 @@ void cuda_bb(void* bb, void* GG, void* delx,void* diagx, int *n, int *m) {
     }
     cudaFree(temp);
     cudaFree(temp_sum);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -231,7 +234,7 @@ void cuda_AA(void* AA, void* GG, void* diagx, int *n, int *m) {
     }
     cudaFree(temp);
     cudaFree(temp_sum);
-    //CUDA_CHECK(cudaGetLastError());
+   CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -240,7 +243,7 @@ void cuda_dx(void* dx,void* delx, void* diagx, void* GG, void* dlambda, int* n, 
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     dx_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> >((real*)dx, (real*)delx,  (real*)diagx,(real*) GG,
         (real*)dlambda, *n,*m);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 void cuda_dxsi(void* dxsi, void* xsi, void* dx,void* x,
@@ -249,7 +252,7 @@ void cuda_dxsi(void* dxsi, void* xsi, void* dx,void* x,
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     dxsi_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> >((real*)dxsi, (real*)xsi,  (real*)dx,(real*) x,
         (real*)alpha, *epsi,*n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 void cuda_deta(void* deta, void* eta, void* dx, void* x,
@@ -258,7 +261,7 @@ void cuda_deta(void* deta, void* eta, void* dx, void* x,
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     deta_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)deta, (real*)eta, (real*)dx, (real*)x,
         (real*)beta, *epsi, *n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -299,6 +302,7 @@ void mma_gensub_gpu(void* x, void* xold1, void* xold2, void* df0dx, void* dfdx, 
     }
     cudaFree(temp);
     cudaFree(temp_sum);
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -311,7 +315,7 @@ void cuda_rex(void* rex, void* x, void* xlow, void* xupp, void* pij, void* p0j,
 
 	RexCalculation_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)rex, (real*)x, (real*)xlow, (real*)xupp, (real*)pij, (real*)p0j,
 		(real*)qij, (real*)q0j, (real*)lambda, (real*)xsi, (real*)eta, *n, *m);
-	//CUDA_CHECK(cudaGetLastError());
+	CUDA_CHECK(cudaGetLastError());
 
 }
 
@@ -323,7 +327,7 @@ void cuda_rey(void* rey, void* c, void* d, void* y, void* lambda, void* mu, int*
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     rey_calculation_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)rey, (real*)c, (real*)d, (real*)y,
         (real*)lambda, (real*)mu, * n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -338,7 +342,7 @@ void cuda_sub2cons(void * a,void * b,void * c, real *d, int * n) {
 
     sub2cons_kernel<real><<<nblcks, nthrds, 0,(cudaStream_t) glb_cmd_queue>>>((real *) a, (real *) b, (real *) c,
       *d, *n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -352,7 +356,7 @@ real cuda_norm(void* a, int* n) {
    int nb = ((*n) + 2048 - 1) / 2048;
    norm_kernel <real> << <nb, 1024 >> > ((real*)a, temp, (*n));
    mmareduce_kernel<real> << <1, 1024, 0 >> > (temp, nb);
-    //CUDA_CHECK(cudaGetLastError());
+   CUDA_CHECK(cudaGetLastError());
    cudaMemcpy(temp_cpu, temp, sizeof(real), cudaMemcpyDeviceToHost);
    cudaFree(temp);
 
@@ -369,7 +373,7 @@ void cuda_dely(void* dely, void* c, void* d, void* y, void* lambda, real* epsi, 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     dely_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)dely,(real*)c, (real*)d, (real*)y, (real*)lambda,*epsi, * n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -393,10 +397,11 @@ real cuda_maxval2(void* a, void* b, real* cons, int* n) {
     int nb = ((*n) + 2048 - 1) / 2048;
     maxval2_kernel <real> << <nb, 1024 >> > ((real*)a, (real*)b, temp, (*cons), (*n));
     max_reduce_kernel<real> << <1, 1024, 0 >> > (temp, nb);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
     cudaMemcpy(temp_cpu, temp, sizeof(real), cudaMemcpyDeviceToHost);
     cudaFree(temp);
     return temp_cpu[0];
+
 }
 
 real cuda_maxval3(void* a, void* b, void* c, real* cons, int* n) {
@@ -406,7 +411,7 @@ real cuda_maxval3(void* a, void* b, void* c, real* cons, int* n) {
     int nb = ((*n) + 2048 - 1) / 2048;
     maxval3_kernel <real> << <nb, 1024 >> > ((real*)a, (real*)b, (real*)c, temp, (*cons), (*n));
     max_reduce_kernel<real> << <1, 1024, 0 >> > (temp, nb);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
     cudaMemcpy(temp_cpu, temp, sizeof(real), cudaMemcpyDeviceToHost);
     cudaFree(temp);
     return temp_cpu[0];
@@ -419,7 +424,7 @@ void cuda_kkt_rex(void* rex, void* df0dx, void* dfdx, void* xsi,
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     kkt_rex_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)rex, (real*)df0dx, (real*)dfdx, (real*)xsi,
         (real*)eta, (real*)lambda, *n, *m);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -428,7 +433,7 @@ void cuda_maxcons(void* a, real* b, real* c, void* d, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     maxcons_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)a, *b, *c, (real*)d, *n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
@@ -439,7 +444,7 @@ real cuda_lcsum(void *a, int *n) {
    int nb = ((*n) + 2048 - 1) / 2048;
    glsum_kernel <real> << <nb, 1024 >> > ((real*)a,  temp, (*n));
    mmareduce_kernel<real> << <1, 1024, 0 >> > (temp, nb);
-    //CUDA_CHECK(cudaGetLastError());
+   CUDA_CHECK(cudaGetLastError());
    cudaMemcpy(temp_cpu, temp, sizeof(real), cudaMemcpyDeviceToHost);
    cudaFree(temp);
    return temp_cpu[0];
@@ -452,7 +457,7 @@ real cuda_lcsc2(void *a, void*b, int *n) {
    int nb = ((*n) + 2048 - 1) / 2048;
    glsc2_kernel <real> << <nb, 1024 >> > ((real*)a, (real*)b, temp, (*n));
    mmareduce_kernel<real> << <1, 1024, 0 >> > (temp, nb);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
    cudaMemcpy(temp_cpu, temp, sizeof(real), cudaMemcpyDeviceToHost);
    cudaFree(temp);
    return temp_cpu[0];
@@ -471,8 +476,9 @@ void cuda_mpisum(void *a, int *n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     add2inv2_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)a, (real*) b, *c, *n);
-    //CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
 }
 
 
 
+}

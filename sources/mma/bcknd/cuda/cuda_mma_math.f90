@@ -4,37 +4,37 @@ module cuda_mma_math
   public
   
   interface
-     subroutine mma_gensub1_gpu(low_d, upp_d,x_d, xmin_d, xmax_d, asyinit, n) &
-          bind(c, name = 'mma_gensub1_gpu')
+     subroutine mma_gensub1_cuda(low_d, upp_d,x_d, xmin_d, xmax_d, asyinit, n) &
+          bind(c, name = 'mma_gensub1_cuda')
        use, intrinsic :: iso_c_binding, only: c_int, c_ptr
        import c_rp
        type(c_ptr), value :: low_d, upp_d,x_d, xmin_d, xmax_d
        real(c_rp) :: asyinit
        integer(c_int) :: n
-     end subroutine mma_gensub1_gpu
+     end subroutine mma_gensub1_cuda
 
-     subroutine mma_gensub2_gpu(low_d, upp_d, x_d, xold1_d, xold2_d,xmin_d, xmax_d, asydecr, asyincr, n) &
-          bind(c, name = 'mma_gensub2_gpu')
+     subroutine mma_gensub2_cuda(low_d, upp_d, x_d, xold1_d, xold2_d,xmin_d, xmax_d, asydecr, asyincr, n) &
+          bind(c, name = 'mma_gensub2_cuda')
        use, intrinsic :: iso_c_binding, only: c_int, c_ptr
        import c_rp
        type(c_ptr), value :: low_d, upp_d, x_d, xold1_d, xold2_d,xmin_d, xmax_d
        real(c_rp) :: asydecr, asyincr
        integer(c_int) :: n
-     end subroutine mma_gensub2_gpu
+     end subroutine mma_gensub2_cuda
 
-     subroutine mma_gensub3_gpu(x_d, df0dx_d, dfdx_d,low_d, upp_d, min_d,max_d,alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m) &
-          bind(c, name = 'mma_gensub3_gpu')
+     subroutine mma_gensub3_cuda(x_d, df0dx_d, dfdx_d,low_d, upp_d, min_d,max_d,alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m) &
+          bind(c, name = 'mma_gensub3_cuda')
        use, intrinsic :: iso_c_binding, only: c_int, c_ptr
        type(c_ptr), value :: x_d, df0dx_d, dfdx_d,low_d, upp_d, min_d, max_d,alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d
        integer(c_int) :: n, m
-     end subroutine mma_gensub3_gpu
+     end subroutine mma_gensub3_cuda
 
-     subroutine mma_gensub4_gpu(x_d, low_d, upp_d, pij_d, qij_d, n, m, bi_d) &
-          bind(c, name = 'mma_gensub4_gpu')
+     subroutine mma_gensub4_cuda(x_d, low_d, upp_d, pij_d, qij_d, n, m, bi_d) &
+          bind(c, name = 'mma_gensub4_cuda')
        use, intrinsic :: iso_c_binding, only: c_int, c_ptr
        type(c_ptr), value :: x_d, low_d, upp_d, pij_d, qij_d, bi_d
        integer(c_int) :: n, m
-     end subroutine mma_gensub4_gpu
+     end subroutine mma_gensub4_cuda
 
      subroutine cuda_mma_max(xsi_d,x_d,alpha_d,n) &
           bind(c, name = 'cuda_mma_max')

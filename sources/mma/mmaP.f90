@@ -35,7 +35,7 @@ module mma
 
   ! Inclusions from Neko
   use num_types, only: rp
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use neko_config
   use vector, only: vector_t
   use matrix, only: matrix_t
   use json_module, only: json_file
@@ -128,7 +128,7 @@ module mma
 
 
 
-       !> Generate the approximation sub problem on the CPU.
+       !> Generate the approximation sub problem on the GPU.
      module subroutine mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        type(vector_t), intent(in) :: x
@@ -138,13 +138,13 @@ module mma
        integer, intent(in) :: iter
      end subroutine mma_gensub_gpu
 
-     !> Solve the dual with an interior point method on the CPU.
+     !> Solve the dual with an interior point method on the GPU.
      module subroutine mma_subsolve_dpip_gpu(this, designx)
         class(mma_t), intent(inout) :: this
         type(vector_t), intent(in) :: designx
      end subroutine mma_subsolve_dpip_gpu
 
-     !> Compute the KKT condition for a given design x on the CPU.
+     !> Compute the KKT condition for a given design x on the GPU.
      module subroutine mma_KKT_gpu(this, x, df0dx, fval, dfdx)
         class(mma_t), intent(inout) :: this
         type(vector_t), intent(in) :: x
