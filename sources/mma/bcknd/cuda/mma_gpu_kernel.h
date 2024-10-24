@@ -130,7 +130,7 @@ __global__ void maxval_kernel(const T*  __restrict__ a, T *temp, const int n) {
 	const unsigned int wid = threadIdx.x / warpSize;
 
 	__shared__ T shared[32];
-	T maxval = 0;
+	T maxval = 0.0;
 	for (int i = idx; i < n; i += str)
 	{
 		maxval = max(maxval,abs(a[i]));
@@ -141,7 +141,7 @@ __global__ void maxval_kernel(const T*  __restrict__ a, T *temp, const int n) {
 		shared[wid] = maxval;
 	__syncthreads();
 
-	maxval = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+	maxval = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0.0;
 	if (wid == 0)
 		maxval = max_reduce_warp<T>(maxval);
 
@@ -153,7 +153,7 @@ __global__ void maxval_kernel(const T*  __restrict__ a, T *temp, const int n) {
 template <typename T>
 __global__ void max_reduce_kernel(T*  __restrict__ bufred, const int n) {
 
-	T maxval = 0;
+	T maxval = 0.0;
 	const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	const int str = blockDim.x * gridDim.x;
 	for (int i = idx; i < n; i += str)
@@ -170,7 +170,7 @@ __global__ void max_reduce_kernel(T*  __restrict__ bufred, const int n) {
 		shared[wid] = maxval;
 	__syncthreads();
 
-	maxval = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+	maxval = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0.0;
 	if (wid == 0)
 		maxval = max_reduce_warp<T>(maxval);
 
@@ -194,14 +194,7 @@ __global__ void delx_kernel(T* __restrict__ delx, const T* __restrict__ x, const
 	}
 }
 
-template <typename T>
-__global__ void dellambda_kernel(T* __restrict__ temp, const T* __restrict__ x, const T* __restrict__ xlow, const T* __restrict__ xupp,
-	const T* __restrict__ pij, const T* __restrict__ qij, const int n) {
-	int tj = blockIdx.x * blockDim.x + threadIdx.x;
-	if (tj < n) {
-		temp[tj] = pij[tj] / (xupp[tj] - x[tj]) + qij[tj] / (x[tj] - xlow[tj]);
-	}
-}
+
 template <typename T>
 __global__ void GG_kernel(T* __restrict__ GG, const T* __restrict__ x, const T* __restrict__ xlow, const T* __restrict__ xupp,
 	const T* __restrict__ pij, const T* __restrict__ qij, const int n, const int m) {
@@ -559,7 +552,7 @@ __global__ void maxval2_kernel(const T* __restrict__ a, const T* __restrict__ b,
 		shared[wid] = maxval;
 	__syncthreads();
 
-	maxval = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+	maxval = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0.0;
 	if (wid == 0)
 		maxval = max_reduce_warp<T>(maxval);
 
@@ -706,4 +699,48 @@ __global__ void add2inv2_kernel(T* __restrict__ a, const T* __restrict__ b, cons
 		a[tj] = a[tj]+c/b[tj];
 	}
 }
+
+template <typename T>
+__global__ void max2_kernel(T* __restrict__ a, const T b, const T* __restrict__ c, const T d, const int n) {
+	int tj = blockIdx.x * blockDim.x + threadIdx.x;
+	if (tj < n) {
+		a[tj]=max(b,d*c[tj]);
+	}
+}
+
+template <typename T>
+__global__ void updatebb_kernel(T* __restrict__ bb, const T* __restrict__ dellambda, const T* __restrict__ dely,const T* __restrict__ d,
+	const T* __restrict__ mu,const T* __restrict__ y, const T delz, const int m) {
+	int tj = blockIdx.x * blockDim.x + threadIdx.x;
+	if(tj<m)
+		bb[tj]=dellambda[tj] + dely[tj]/(d[tj] + mu[tj]/y[tj]) - bb[tj];
+	else if(tj<m+1)
+		bb[tj]=delz;
+}
+
+
+
+template <typename T>
+__global__ void updateAA_kernel(T* __restrict__ AA,const T* __restrict__ globaltmp_mm, const T* __restrict__ s, const T* __restrict__ lambda,const T* __restrict__ d,
+	const T* __restrict__ mu,const T* __restrict__ y,const T* __restrict__ a, const T zeta, const T z, const int m) {
+	int tj = blockIdx.x * blockDim.x + threadIdx.x;
+	if(tj<m)
+		{
+			AA[tj+tj*(m+1)]=globaltmp_mm[tj+tj*m] + (s[tj] / lambda[tj] + 1.0/ (d[tj] + mu[tj] / y[tj]));
+			AA[tj+m*(m+1)]=a[tj];
+			AA[m+tj*(m+1)]=a[tj];
+		}
+	else if(tj<m+1)
+		AA[tj+tj*(m+1)]= -zeta/z;
+}
+
+template <typename T>
+__global__ void dy_kernel(T* __restrict__ dy, const T* __restrict__ dely, const T* __restrict__ dlambda,const T* __restrict__ d,
+	const T* __restrict__ mu,const T* __restrict__ y,  const int n) {
+	int tj = blockIdx.x * blockDim.x + threadIdx.x;
+	if(tj<n)
+		dy[tj] = (-dely[tj]+dlambda[tj])/(d[tj] + mu[tj]/y[tj]);
+}
+
+
 

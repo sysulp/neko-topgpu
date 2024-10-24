@@ -228,7 +228,7 @@ contains
     iter =0
     call this%mma%mma_gensub_gpu(iter, Vx, Vdf0dx, Vfval, Vdfdx)
     call this%mma%mma_subsolve_dpip_gpu(Vdesignx)
-
+    call this%mma%mma_KKT_gpu( Vx, Vdf0dx, Vfval, Vdfdx)
   end subroutine simcomp_test_compute
 
   subroutine write_stuff_vtk(stuff, n, filename)
