@@ -229,6 +229,8 @@ contains
     call this%mma%mma_gensub_gpu(iter, Vx, Vdf0dx, Vfval, Vdfdx)
     call this%mma%mma_subsolve_dpip_gpu(Vdesignx)
     call this%mma%mma_KKT_gpu( Vx, Vdf0dx, Vfval, Vdfdx)
+    print *, 'iter=', 0,&
+         '-------,f0val= ', f0val, ',   fval= ', fval
   end subroutine simcomp_test_compute
 
   subroutine write_stuff_vtk(stuff, n, filename)

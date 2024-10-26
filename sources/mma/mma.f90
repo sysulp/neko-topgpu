@@ -40,7 +40,8 @@ module mma
   use matrix, only: matrix_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
-
+  use device
+  use device_math, only:  device_cfill
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
   implicit none
@@ -208,6 +209,9 @@ contains
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
     call json_get_or_default(json, 'mma.backend', backend, 'cpu')
+    !call json_get_or_default(json, 'mma.backend', backend, 'vector')
+
+
 
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parsed parameters
@@ -258,6 +262,11 @@ contains
     call this%xold2%init(n)
     this%xold1%x = x
     this%xold2%x = x
+    !if (this%backend == 'vector') then
+      call device_memcpy(this%xold1%x, this%xold1%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
+      call device_memcpy(this%xold1%x, this%xold2%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
+    !end if
+
 
     call this%alpha%init(n)
     call this%beta%init(n)
@@ -289,13 +298,30 @@ contains
     this%a%x = a
     this%c%x = c
     this%d%x = d
+    !if (this%backend == 'vector') then
+      call device_memcpy(this%a%x, this%a%x_d, this%m, HOST_TO_DEVICE  , sync=.false.)
+      call device_memcpy(this%c%x, this%c%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
+      call device_memcpy(this%d%x, this%d%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
+    !end if
+
+
+
 
     !setting the bounds for the design variable based on the problem
     this%xmax%x = xmax
     this%xmin%x = xmin
+    !if (this%backend == 'vector') then
+      call device_memcpy(this%xmax%x, this%xmax%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
+      call device_memcpy(this%xmin%x, this%xmin%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
+    !end if 
+
 
     this%low%x(:) = minval(x)
     this%upp%x(:) = maxval(x)
+    !if (this%backend == 'vector') then
+      call device_cfill(this%low%x_d, minval(x), this%n)
+      call device_cfill(this%upp%x_d, maxval(x), this%n)
+    !end if 
 
     !setting KKT norms to a large number for the initial design
     this%residumax = huge(0.0_rp)
