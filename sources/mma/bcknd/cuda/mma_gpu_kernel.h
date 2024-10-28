@@ -58,8 +58,10 @@ __global__ void mma_sub3_kernel(const T* __restrict__ x,  const T* __restrict__ 
 
 		q0j[tj] = pow(x[tj] - low[tj], 2) * (0.001 * max(df0dx[tj], 0.0) + 1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
 		for (int i = 0; i < m; i++) {
-			pij[tj + i * n] = pow(upp[tj] - x[tj], 2) * (1.001 * max(dfdx[tj + i * n], 0.0) + 0.001 * max(-dfdx[tj + i * n], 0.0) + 0.00001 / max(0.00001, xgap));
-			qij[tj + i * n] = pow(x[tj] - low[tj], 2) * (0.001 * max(dfdx[tj + i * n], 0.0) + 1.001 * max(-dfdx[tj + i * n], 0.0) + 0.00001 / max(0.00001, xgap));
+			pij[i + tj*m] = pow(upp[tj] - x[tj], 2) * (1.001 * max(dfdx[i + tj*m], 0.0) + 0.001 * max(-dfdx[i + tj*m], 0.0) 
+				+ 0.00001 / max(0.00001, xgap));
+			qij[i + tj*m] = pow(x[tj] - low[tj], 2) * (0.001 * max(dfdx[i + tj*m], 0.0) + 1.001 * max(-dfdx[i + tj*m], 0.0) 
+				+ 0.00001 / max(0.00001, xgap));
 		}
 	}
 }
@@ -71,7 +73,7 @@ __global__ void mma_sub4_kernel(const T* __restrict__ x, T* __restrict__ low, T*
 	int tj = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tj < n) {
 		for (int i = 0; i < m; i++) {
-			temp[tj + i * n] = pij[tj + i * n] / (upp[tj] - x[tj]) + qij[tj + i * n] / (x[tj] - low[tj]);
+			temp[i + tj*m] = pij[i + tj*m] / (upp[tj] - x[tj]) + qij[i + tj*m] / (x[tj] - low[tj]);
 		}
 	}
 }
@@ -93,7 +95,7 @@ __global__ void relambda_kernel(T* __restrict__ temp, const T* __restrict__ x, c
 	int tj = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tj < n) {
 		for (int i = 0; i < m; i++) {
-			temp[tj + i * n] = pij[tj + i * n] / (xupp[tj] - x[tj]) + qij[tj + i * n] / (x[tj] - xlow[tj]);
+			temp[i + tj*m] = pij[i + tj*m] / (xupp[tj] - x[tj]) + qij[i + tj*m] / (x[tj] - xlow[tj]);
 		}
 	}
 }
@@ -186,8 +188,8 @@ __global__ void delx_kernel(T* __restrict__ delx, const T* __restrict__ x, const
 	if (tj < n) {
 		delx[tj]=0;
 		for (int i = 0; i < m; i++) {
-			delx[tj] = delx[tj] + pij[tj + i * n] * lambda[i] / pow(xupp[tj] - x[tj], 2) -
-			qij[tj + i * n] * lambda[i] / pow(x[tj] - xlow[tj], 2);
+			delx[tj] = delx[tj] + pij[i + tj * m] * lambda[i] / pow(xupp[tj] - x[tj], 2) -
+			qij[i + tj * m] * lambda[i] / pow(x[tj] - xlow[tj], 2);
 		}
 		delx[tj] = delx[tj] + p0j[tj] / pow(xupp[tj] - x[tj], 2) - q0j[tj] / pow(x[tj] - xlow[tj], 2) - epsi / (x[tj] - alpha[tj])
 		+ epsi / (beta[tj] - x[tj]);
@@ -201,8 +203,7 @@ __global__ void GG_kernel(T* __restrict__ GG, const T* __restrict__ x, const T* 
 	int tj = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tj < n) {
 		for (int ggdumiter = 0; ggdumiter < m; ggdumiter++) {
-			GG[ggdumiter * n + tj] = pij[ggdumiter * n + tj] / pow(xupp[tj] - x[tj], 2) -
-			qij[ggdumiter * n + tj] / pow(x[tj] - xlow[tj], 2);
+			GG[ggdumiter  + m*tj] = pij[ggdumiter + m*tj] / pow(xupp[tj] - x[tj], 2) - qij[ggdumiter + m*tj] / pow(x[tj] - xlow[tj], 2);
 		}
 	}
 }
@@ -215,11 +216,11 @@ __global__ void diagx_kernel(T* __restrict__ diagx, const T* __restrict__ x, con
 		T sum = 0;
 		T sum1 = 0;
 		for (int i = 0; i < m; i++) {
-			sum = sum + pij[tj + i * n] * lambda[i];
-			sum1 = sum1 + qij[tj + i * n] * lambda[i];
+			sum = sum + pij[tj *m+ i] * lambda[i];
+			sum1 = sum1 + qij[tj*m + i] * lambda[i];
 		}
 		diagx[tj] = (p0j[tj] + sum) / pow(xupp[tj] - x[tj], 3) + (q0j[tj] + sum1) / pow(x[tj] - xlow[tj], 3);
-		diagx[tj] = 2 * diagx[tj] + xsi[tj] / (x[tj] - alpha[tj]) + eta[tj] / (beta[tj] - x[tj]);
+		diagx[tj] = 2.0 * diagx[tj] + xsi[tj] / (x[tj] - alpha[tj]) + eta[tj] / (beta[tj] - x[tj]);
 	}
 }
 
@@ -270,7 +271,7 @@ __global__ void mmareduce_kernel(T* __restrict__ bufred, const int n) {
 
 
 template< typename T >
-__global__ void mmasum_kernel(const T*  __restrict__ a, T*  __restrict__ buf_h, const int n, const int k) {
+__global__ void mmasum_kernel(const T*  __restrict__ a, T*  __restrict__ buf_h, const int n, const int m, const int k) {
 
 	const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	const int str = blockDim.x * gridDim.x;
@@ -282,7 +283,68 @@ __global__ void mmasum_kernel(const T*  __restrict__ a, T*  __restrict__ buf_h, 
 	T sum = 0;
 	for (int i = idx; i < n; i += str)
 	{
-		sum += a[i + k * n];
+		sum += a[m * i + k ];
+	}
+
+	sum = reduce_warp<T>(sum);
+	if (lane == 0)
+		shared[wid] = sum;
+	__syncthreads();
+
+	sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+	if (wid == 0)
+		sum = reduce_warp<T>(sum);
+
+	if (threadIdx.x == 0)
+		buf_h[blockIdx.x] = sum;
+
+}
+template< typename T >
+__global__ void mmasumbb_kernel(const T*  __restrict__ GG, const T*  __restrict__ delx, const T*  __restrict__ diagx,
+	T*  __restrict__ buf_h, const int n, const int m, const int k) {
+
+	const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	const int str = blockDim.x * gridDim.x;
+
+	const unsigned int lane = threadIdx.x % warpSize;
+	const unsigned int wid = threadIdx.x / warpSize;
+
+	__shared__ T shared[32];
+	T sum = 0;
+	for (int i = idx; i < n; i += str)
+	{
+		sum += GG[ k + i * m] * delx[i] / diagx[i];
+	}
+
+	sum = reduce_warp<T>(sum);
+	if (lane == 0)
+		shared[wid] = sum;
+	__syncthreads();
+
+	sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+	if (wid == 0)
+		sum = reduce_warp<T>(sum);
+
+	if (threadIdx.x == 0)
+		buf_h[blockIdx.x] = sum;
+
+}
+
+template< typename T >
+__global__ void mmasumAA_kernel(const T*  __restrict__ GG, const T*  __restrict__ diagx,
+	T*  __restrict__ buf_h, const int n, const int m, const int k0, const int k1) {
+
+	const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	const int str = blockDim.x * gridDim.x;
+
+	const unsigned int lane = threadIdx.x % warpSize;
+	const unsigned int wid = threadIdx.x / warpSize;
+
+	__shared__ T shared[32];
+	T sum = 0;
+	for (int i = idx; i < n; i += str)
+	{
+		sum += GG[ k0 + i * m] /diagx[i]  * GG[ k1 + i * m];
 	}
 
 	sum = reduce_warp<T>(sum);
@@ -302,16 +364,12 @@ __global__ void mmasum_kernel(const T*  __restrict__ a, T*  __restrict__ buf_h, 
 
 
 template <typename T>
-__global__ void bb_kernel(T* __restrict__ temp, const T* __restrict__ GG, const T* __restrict__ delx, const T* __restrict__ diagx,
-	const int n, const int m) {
+__global__ void mma_copy_kernel(T* __restrict__ a, const T* __restrict__ b, const int n, const int m) {
 	int tj = blockIdx.x * blockDim.x + threadIdx.x;
-	if (tj < n) {
-		for(int i=0;i<m;i++)
-		{
-			temp[tj+n*i] = GG[tj+n*i] * (delx[tj] / diagx[tj]);
-		}
-	}
+		if(tj<n)
+			a[tj+m]=b[tj];
 }
+
 
 
 
@@ -340,7 +398,7 @@ __global__ void dx_kernel(T* __restrict__ dx, const T* __restrict__ delx, const 
 	if (tj < n) {
 		dx[tj] = -delx[tj]/diagx[tj];
 		for(int i=0;i<m;i++){
-			dx[tj] =dx[tj] - GG[tj+i*n]*dlambda[i]/diagx[tj];
+			dx[tj] =dx[tj] - GG[tj*m+i]*dlambda[i]/diagx[tj];
 		}
 	}
 }
@@ -369,75 +427,6 @@ __global__ void deta_kernel(T* __restrict__ deta, const T* __restrict__ eta, con
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-template< typename T >
-__global__ void BoundCalculation_kernel(const T* __restrict__ x, const T* __restrict__ xold1, const T* __restrict__ xold2, const T* __restrict__ df0dx, const T* __restrict__ dfdx,
-	T* __restrict__ xlow, T* __restrict__ xupp, const T* __restrict__ xmin, const T* __restrict__ xmax,
-	T* __restrict__ alpha, T* __restrict__ beta, T* __restrict__ p0j, T* __restrict__ q0j, T* __restrict__ pij, T* __restrict__ qij, T* __restrict__ temp,
-	const T asyinit, const T asydecr, const T asyincr,
-	const int n, const int m, const int iter) {
-	int tj = blockIdx.x * blockDim.x + threadIdx.x;
-	if (tj < n) {
-		T xgap = xmax[tj] - xmin[tj];
-		if (iter < 3) {
-			xlow[tj] = x[tj] - asyinit * xgap;
-			xupp[tj] = x[tj] + asyinit * xgap;
-		}
-
-		else {
-			T xdiff = (x[tj] - xold1[tj]) * (xold1[tj] - xold2[tj]);
-			if (xdiff < 0)
-			{
-				xlow[tj] = x[tj] - asydecr * (xold1[tj] - xlow[tj]);
-				xupp[tj] = x[tj] + asydecr * (xupp[tj] - xold1[tj]);
-			}
-			else if (xdiff > 0)
-			{
-				xlow[tj] = x[tj] - asyincr * (xold1[tj] - xlow[tj]);
-				xupp[tj] = x[tj] + asyincr * (xupp[tj] - xold1[tj]);
-			}
-			else {
-				xlow[tj] = x[tj] - (xold1[tj] - xlow[tj]);
-				xupp[tj] = x[tj] + (xupp[tj] - xold1[tj]);
-			}
-			xlow[tj] = max(xlow[tj], x[tj] - 10 * xgap);
-			xlow[tj] = min(xlow[tj], x[tj] - 0.01 * xgap);
-			xupp[tj] = min(xupp[tj], x[tj] + 10 * xgap);
-			xupp[tj] = max(xupp[tj], x[tj] - 0.01 * xgap);
-
-		}
-		alpha[tj] = max(max(xmin[tj], xlow[tj] + 0.1 * (x[tj] - xlow[tj])), x[tj] - 0.5 * xgap);
-		beta[tj] = min(min(xmax[tj], xupp[tj] - 0.1 * (xupp[tj] - x[tj])), x[tj] + 0.5 * xgap);
-
-        //Calculate p0j, q0j, pij, qij
-       ///where j = 1, 2, ..., n and i = 1, 2, ..., m(eq(2.3) - eq(2.5))
-		p0j[tj] = pow(xupp[tj] - x[tj], 2) * (1.001 * max(df0dx[tj], 0.0) + 0.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
-
-		q0j[tj] = pow(x[tj] - xlow[tj], 2) * (0.001 * max(df0dx[tj], 0.0) + 1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
-		for (int i = 0; i < m; i++) {
-			pij[tj + i * n] = pow(xupp[tj] - x[tj], 2) * (1.001 * max(dfdx[tj + i * n], 0.0) + 0.001 * max(-dfdx[tj + i * n], 0.0) + 0.00001 / max(0.00001, xgap));
-			qij[tj + i * n] = pow(x[tj] - xlow[tj], 2) * (0.001 * max(dfdx[tj + i * n], 0.0) + 1.001 * max(-dfdx[tj + i * n], 0.0) + 0.00001 / max(0.00001, xgap));
-			temp[tj + i * n] = pij[tj + i * n] / (xupp[tj] - x[tj]) + qij[tj + i * n] / (x[tj] - xlow[tj]);
-		}
-	}
-}
-
-
 template <typename T>
 __global__ void RexCalculation_kernel(T* __restrict__ rex, const T* __restrict__ x, const T* __restrict__ xlow, const T* __restrict__ xupp, const T* __restrict__ pij, const T* __restrict__ p0j,
 	const T* __restrict__ qij, const T* __restrict__ q0j, const T* __restrict__ lambda, const T* __restrict__ xsi, const T* __restrict__ eta, const int n, const int m) {
@@ -445,7 +434,7 @@ __global__ void RexCalculation_kernel(T* __restrict__ rex, const T* __restrict__
 	if (tj < n) {
 		rex[tj] = 0.0;
 		for (int i = 0; i < m; i++) {
-			rex[tj] = rex[tj] + pij[tj + i * n] * lambda[i] / pow(xupp[tj] - x[tj], 2) - qij[tj + i * n] * lambda[i] / pow(x[tj] - xlow[tj], 2);
+			rex[tj] = rex[tj] + pij[i +tj*m] * lambda[i] / pow(xupp[tj] - x[tj], 2) - qij[i +tj*m] * lambda[i] / pow(x[tj] - xlow[tj], 2);
 		}
 		rex[tj] = rex[tj] + p0j[tj] / pow(xupp[tj] - x[tj], 2) - q0j[tj] / pow(x[tj] - xlow[tj], 2) - xsi[tj] + eta[tj];
 	}

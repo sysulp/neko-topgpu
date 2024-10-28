@@ -299,7 +299,7 @@ contains
     this%c%x = c
     this%d%x = d
     !if (this%backend == 'vector') then
-      call device_memcpy(this%a%x, this%a%x_d, this%m, HOST_TO_DEVICE  , sync=.false.)
+      call device_memcpy(this%a%x, this%a%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
       call device_memcpy(this%c%x, this%c%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
       call device_memcpy(this%d%x, this%d%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
     !end if

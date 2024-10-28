@@ -61,6 +61,9 @@ else
      x(j) + 0.01*(this%xmax%x(j) - this%xmin%x(j)))
 end do
 end if
+print *, "I am in mma_cpu.f90"
+print *, "upp=", this%upp%x(1)
+print *, "low=", this%low%x(1)
 ! we can move alpha and beta out of the following loop if needed as:
 ! this%alpha = max(this%xmin, this%low + &
 !     0.1*(this%x- this%low), this%x - 0.5*(this%xmax - this%xmin))
@@ -107,6 +110,8 @@ do j = 1, this%n
                (this%xmax%x(j) - this%xmin%x(j))))))
 end do
 end do
+print *, "alpha=", this%alpha%x(1)
+print *, "beta=", this%beta%x(1)
 
 !computing bi as defined in page 5
 this%bi%x = 0.0_rp
@@ -174,12 +179,14 @@ end do
 ! print *, "longbi =  ", longbi+longbiglobal, "first + second"
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+print *, "pij=",sum(this%pij%x)
+print *, "qij=",sum(this%qij%x)
 
 globaltmp_m = 0.0_rp
 call MPI_Allreduce(this%bi%x, globaltmp_m, this%m, &
     mpi_real_precision, mpi_sum, neko_comm, ierr)
 this%bi%x = globaltmp_m - fval
+print *, "bi=", this%bi%x
 
 end subroutine mma_gensub_cpu
 
@@ -243,8 +250,8 @@ subroutine mma_subsolve_dpip_cpu(this, designx)
     xsi(:) = max(1.0_rp, 1.0_rp/(x(:) - this%alpha%x(:)))
     eta(:) = max(1.0_rp, 1.0_rp/(this%beta%x(:) - x(:)))
     mu(:) = max(1.0_rp, 0.5_rp*this%c%x(:))
-
-    do while (epsi .gt. 0.9*this%epsimin)
+    print *, "xsi=", sum(xsi), "eta=", sum(eta), "mu=", sum(mu)
+    outer: do while (epsi .gt. 0.9*this%epsimin)
        ! calculating residuals based on
        ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
        ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
@@ -273,7 +280,6 @@ subroutine mma_subsolve_dpip_cpu(this, designx)
 
        rey(:) = this%c%x(:) + this%d%x(:)*y(:) - lambda(:) - mu(:)
        rez = this%a0 - zeta - dot_product(lambda(:), this%a%x(:))
-
        ! relambda(:) = matmul(this%pij%x(:,:),1.0/(this%upp%x(:) - x(:))) + &
        !         matmul(this%qij%x(:,:), 1.0/(x(:) - this%low%x(:))) - &
        !         this%a%x(:)*z - y(:) + s(:) - this%bi%x(:)
@@ -287,10 +293,11 @@ subroutine mma_subsolve_dpip_cpu(this, designx)
         end do
    end do
 
-
    globaltmp_m = 0.0_rp
    call MPI_Allreduce(relambda, globaltmp_m, this%m, &
        mpi_real_precision, mpi_sum, neko_comm, ierr)
+   print *, "globaltmp_m=", globaltmp_m
+
    relambda = globaltmp_m - this%a%x(:)*z - y(:) + s(:) - this%bi%x(:)
 
 
@@ -305,7 +312,7 @@ subroutine mma_subsolve_dpip_cpu(this, designx)
 
    call MPI_Allreduce(maxval(abs(residu)), residumax, 1, &
        mpi_real_precision, mpi_max, neko_comm, ierr)
-
+   print *, "residumax=", residumax
    re_xstuff_squ_global = 0.0_rp
    call MPI_Allreduce(norm2(rex)**2+norm2(rexsi)**2+norm2(reeta)**2,&
        re_xstuff_squ_global, 1, mpi_real_precision, mpi_sum,&
@@ -313,6 +320,7 @@ subroutine mma_subsolve_dpip_cpu(this, designx)
    residu_small = [rey, rez, relambda, &
    remu, rezeta, res]
    residunorm = sqrt(norm2(residu_small)**2 + re_xstuff_squ_global)
+   print *, "residunorm=", residunorm
 
 
    do iter = 1, this%max_iter !ittt
@@ -336,6 +344,12 @@ subroutine mma_subsolve_dpip_cpu(this, designx)
       - epsi/(x(j) - this%alpha%x(j)) &
       + epsi/(this%beta%x(j) - x(j))
  end do
+
+
+     if(iter==1) then
+      print *, "delx=", sum(delx)
+    end if
+
  dely = this%c%x + this%d%x*y - lambda - epsi/y
  delz = this%a0 - dot_product(lambda(:), this%a%x(:)) - epsi/z
 
@@ -352,6 +366,9 @@ end do
 globaltmp_m = 0.0_rp
 call MPI_Allreduce(dellambda, globaltmp_m, this%m, &
      mpi_real_precision, mpi_sum, neko_comm, ierr)
+if(iter==1) then
+    print *, "globaltmp_m=", globaltmp_m
+end if
 
 dellambda = globaltmp_m - this%a%x*z - y - this%bi%x + epsi/lambda
 
@@ -372,14 +389,18 @@ do ggdumiter = 1, this%m
    (this%upp%x(:) - x(:))**2 - &
    this%qij%x(ggdumiter,:)/(x(:) - this%low%x(:))**2
 end do
-
+if(iter==1) then
+     print *, "GG=", sum(GG)
+end if
 diagx(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
      lambda(:)))/(this%upp%x(:) - x(:))**3 + &
 (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
      lambda(:)))/(x(:) - this%low%x(:))**3 )
 diagx(:) = 2.0_rp*diagx(:) + xsi(:)/(x(:) - this%alpha%x(:)) + &
 eta(:)/(this%beta%x(:)- x(:))
-
+if(iter==1) then
+     print *, "diagx=", sum(diagx)
+end if
 
 !Here we only consider the case m<n in the matlab code
 !assembling the right hand side matrix based on eq(5.20)
@@ -392,9 +413,17 @@ do i = 1, this%m
       bb(i) = bb(i) + GG(i, j) * (delx(j) / diagx(j))
  end do
 end do
+
+if(iter==1) then
+     print *, "bb=", bb
+end if
 globaltmp_m = 0.0_rp
 call MPI_Allreduce(bb(1:this%m), globaltmp_m, this%m, &
      mpi_real_precision, mpi_sum, neko_comm, ierr)
+ if(iter==1) then
+   print *, "globaltmp_m=", globaltmp_m
+ end if
+
 bb(1:this%m) = globaltmp_m
 
 bb(1:this%m) = dellambda + dely/(this%d%x + (mu/y)) - bb(1:this%m)
@@ -429,12 +458,13 @@ do i = 1, this%m
    AA(i, i) = AA(i, i) + (s(i) / lambda(i) + &
         1.0_rp / (this%d%x(i) + mu(i) / y(i)))
 end do
-
 AA(1:this%m, this%m+1) = this%a%x(:)
 AA(this%m+1, 1:this%m) = this%a%x(:)
 AA(this%m+1, this%m+1) = -zeta/z
 
-
+ if(iter==1) then
+   print *, "AA=", AA
+ end if
 
 
 call DGESV(this%m+1, 1, AA, this%m+1, ipiv, bb, this%m+1, info)
@@ -444,7 +474,9 @@ if (info .ne. 0) then
    write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
    error stop
 end if
-
+  if(iter==1) then
+   print *, "bb=", bb
+ end if
 dlambda = bb(1:this%m)
 dz = bb(this%m + 1)
 ! based on eq(5.19)
@@ -453,6 +485,13 @@ dx = -delx/diagx - matmul(transpose(GG), dlambda)/diagx
 dy = (-dely+dlambda)/(this%d%x(:) + (mu(:)/y(:)))
 dxsi = -xsi + (epsi-dx*xsi(:))/(x(:) - this%alpha%x(:))
 deta = -eta + (epsi+dx*eta(:))/(this%beta%x(:) - x(:))
+
+ if(iter==1) then
+   print *, "dxsi=", sum(dxsi)
+   print *, "deta=", sum(deta)
+ end if
+
+
 dmu = -mu + (epsi-mu*dy(:))/y(:)
 dzeta = -zeta + (epsi-zeta*dz)/z
 ds = -s + (epsi-dlambda*s(:))/lambda(:)
@@ -466,6 +505,7 @@ steg = 1.0_rp/steg
 
 call MPI_Allreduce(steg, steg, 1, &
      mpi_real_precision, mpi_min, neko_comm, ierr)
+ print *, "steg=",steg
 
 xold = x
 yold = y
@@ -496,10 +536,14 @@ do while ((newresidu .gt. residunorm) .and. (itto .lt. 50))
    !recompute the newresidu to see if this stepsize improves
    !the residue
    rex(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
-        lambda(:)))/(this%upp%x(:) - x(:))**2 - &
+       lambda(:)))/(this%upp%x(:) - x(:))**2 - &
    (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
-        lambda(:)))/(x(:) - this%low%x(:))**2 ) - &
+       lambda(:)))/(x(:) - this%low%x(:))**2 ) - &
    xsi(:) + eta(:)
+   print *, "rex=",sum(rex)
+   print *, "xsi=",sum(xsi)
+   print *, "eta=",sum(eta)
+   print *, "lambda=",lambda
    rey(:) = this%c%x(:) + this%d%x(:)*y(:) - lambda(:) - mu(:)
    rez = this%a0 - zeta - dot_product(lambda(:), this%a%x(:))
    ! relambda(:) = matmul(this%pij%x(:,:),1.0/&
@@ -518,6 +562,8 @@ end do
 globaltmp_m = 0.0_rp
 call MPI_Allreduce(relambda, globaltmp_m, this%m, &
    mpi_real_precision, mpi_sum, neko_comm, ierr)
+   print *,"globaltmp_m=",globaltmp_m
+
 relambda = globaltmp_m
 
 
@@ -540,18 +586,20 @@ residu_small = [rey, rez, relambda, &
 remu, rezeta, res]
 newresidu = sqrt(norm2(residu_small)**2 + &
    re_xstuff_squ_global)
+   print *, "newresidu", newresidu
 
 steg = steg/2.0_rp
+exit outer
 end do
 
 residunorm = newresidu
 residumax = 0.0_rp
 call MPI_Allreduce(maxval(abs(residu)), residumax, 1, &
      mpi_real_precision, mpi_max, neko_comm, ierr)
-
+ print *, "newresidu", residumax
 !correct the step size for the extra devision by 2 in the final
 !loop
-steg = 2*steg
+steg = 2.0_rp*steg
 
 ! print *,"Processor ",pe_rank, "iter = ", iter, "epsi = ", epsi, &
 !     "steg = ", steg, "residunorm = ",residunorm, &
@@ -559,7 +607,7 @@ steg = 2*steg
 end do
 epsi = 0.1_rp*epsi
 
-end do
+end do outer
 
 ! Save the new design
 this%xold2 = this%xold1

@@ -184,13 +184,6 @@ subroutine cuda_maxcons(a_d,b,c, d_d, n) &
 end subroutine cuda_maxcons
 
 
-subroutine cuda_lcsum(a_d, n) &
-     bind(c, name = 'cuda_lcsum')
-     use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-     type(c_ptr), value :: a_d
-     integer(c_int) :: n
-end subroutine cuda_lcsum
-
 real(c_rp) function  cuda_lcsc2(a_d, b_d, n)  &
 bind(c, name = 'cuda_lcsc2')
 use, intrinsic :: iso_c_binding, only: c_int, c_ptr
